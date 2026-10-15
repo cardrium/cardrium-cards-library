@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "1",
+  "meta": {
+    "id": "keyword-watch",
+    "name": "关键词动态",
+    "description": "跟踪几个关键词的最新公开报道，自动标出新出现的内容（含自定义代码示例）",
+    "author": "official",
+    "version": "1.0.1",
+    "icon": "🔎",
+    "tags": [
+      "资讯",
+      "监测",
+      "联网搜索",
+      "代码示例"
+    ],
+    "locale": "zh-CN",
+    "license": "MIT-0",
+    "source": "human"
+  },
+  "permissions": {
+    "network": [],
+    "model": true,
+    "storage": true,
+    "code": true
+  },
+  "limits": {
+    "modelCallsPerRun": 2
+  },
+  "estimates": {
+    "modelCalls": 1,
+    "searchCalls": 5,
+    "inputTokens": 6000,
+    "outputTokens": 1500
+  },
+  "inputs": [
+    {
+      "key": "keywords",
+      "label": "关键词（每行一个，最多 5 个）",
+      "type": "text",
+      "required": true,
+      "maxLines": 5,
+      "placeholder": "AI Agent\n本地优先软件\n开源大模型"
+    },
+    {
+      "key": "exclude",
+      "label": "排除词",
+      "type": "string"
+    },
+    {
+      "key": "window",
+      "label": "时间范围",
+      "type": "select",
+      "default": "24 小时",
+      "options": [
+        {
+          "value": "24 小时",
+          "label": "24 小时"
+        },
+        {
+          "value": "7 天",
+          "label": "7 天"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "trigger": {
+      "onOpen": {
+        "skipIfFreshMinutes": 120
+      },
+      "manual": true,
+      "intervalMinutes": 240
+    },
+    "steps": [
+      {
+        "id": "n1",
+        "type": "storage",
+        "name": "读取已看过的链接",
+        "op": "get",
+        "key": "seen",
+        "default": []
+      },
+      {
+        "id": "n2",
+        "type": "ai_search",
+        "name": "联网搜索关键词",
+        "model": {
+          "tier": "fast",
+          "needs": [
+            "web_search",
+            "json"
+          ]
+        },
+        "prompt": "请分别搜索下面每个关键词在过去{{inputs.window}}内的最新公开报道、公告或博客文章：\n{{inputs.keywords}}\n排除包含这些词的结果：{{inputs.exclude}}\n每个关键词最多 5 条，只保留和关键词本身直接相关的内容。每条给出：对应的关键词、标题、原文链接（必须来自搜索结果）、来源名、发布时间（ISO 日期，不确定就留空）、一句话摘要（不超过 50 字）。",
+        "maxSearches": 5,
+        "outputFormat": "json",
+        "jsonShape": {
+          "items": [
+            {
+              "keyword": "Deno",
+              "title": "标题",
+              "url": "https://example.com/post",
+              "source": "来源名",
+              "publishedAt": "2026-09-27",
+              "summary": "一句话摘要"
+            }
+          ]
+        },
+        "verifyUrls": true,
+        "maxTokens": 2000
+      },
+      {
+        "id": "n3",
+        "type": "code",
+        "name": "链接规范化、去重、标记新内容",
+        "language": "javascript",
+        "timeoutMs": 2000,
+        "source": "export default async function run(input) {\n  const seen = new Set(input.n1 || []);\n  const norm = (u) => {\n    try {\n      const x = new URL(u);\n      [...x.searchParams.keys()].forEach((k) => { if (k.startsWith('utm_') || k === 'ref') x.searchParams.delete(k); });\n      x.hash = '';\n      const host = x.hostname.replace(/^www\\./, '');\n      return (host + x.pathname.replace(/\\/$/, '') + x.search).toLowerCase();\n    } catch { return null; }\n  };\n  const out = [];\n  const thisRun = new Set();\n  for (const it of (input.n2 && input.n2.items) || []) {\n    const key = norm(it.url);\n    if (!key || thisRun.has(key)) continue;\n    thisRun.add(key);\n    out.push({ ...it, _key: key, isNew: !seen.has(key) });\n  }\n  out.sort((a, b) => (b.isNew - a.isNew) || String(b.publishedAt).localeCompare(String(a.publishedAt)));\n  const merged = [...out.map((i) => i._key), ...seen].filter((v, i, a) => a.indexOf(v) === i).slice(0, 500);\n  return {\n    items: out.map((i) => ({ title: i.title, url: i.url, subtitle: i.summary, source: i.source, badge: i.isNew ? '新' : '', meta: i.keyword + (i.publishedAt ? ' · ' + i.publishedAt.slice(0, 10) : ''), _unverified: i._unverified })),\n    seen: merged,\n    newCount: out.filter((i) => i.isNew).length\n  };\n}"
+      },
+      {
+        "id": "n4",
+        "type": "storage",
+        "name": "保存已看过的链接",
+        "op": "set",
+        "key": "seen",
+        "value": "{{n3.seen}}"
+      },
+      {
+        "id": "n5",
+        "type": "output",
+        "bind": {
+          "items": "{{n3.items}}",
+          "header": {
+            "expr": "n3.newCount > 0 ? $string(n3.newCount) & ' 条新动态' : '没有新动态'"
+          }
+        }
+      }
+    ]
+  },
+  "display": {
+    "component": "list",
+    "options": {
+      "maxItems": 15,
+      "showIndex": false,
+      "emptyText": "还没有搜到相关内容"
+    },
+    "size": {
+      "w": 4,
+      "h": 5
+    }
+  }
+}
