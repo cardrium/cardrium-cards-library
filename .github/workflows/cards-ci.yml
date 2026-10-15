@@ -1,5 +1,14 @@
 # 派生自 ai-workbench/app ops/workflows/example-cards/cards-ci.yml（commit c6fbce5）
 # 必需检查名：cards-ok、review-gate（两者都设为必需）。Actions 均按完整 SHA 固定。部署凭据只用 secrets 占位名。
+# 与模板的差异（有意为之）：
+#   - validate job 改名为 cards-ok；不再有汇总用的 cards-ok job。PR 上不传 --allow-unreviewed，PR 与 push 都按严格模式构建。
+#   - review-gate 重写：只有 contents: read，不调用 GitHub API、不检查 PR Approve，也不再由 pull_request_review 触发；
+#     改为校验仓库内 reviews/ 审核记录与 card.json 的 id / 版本 / sha256 一致（tools/review-gate.mjs）。人工把关靠 CODEOWNER Approve。
+#   - 校验器随仓库提供（tools/card-validator/，与 m0/card-validator 逐字节一致），cards-ok 先按 tools/card-validator.SOURCE.sha256 核对再 npm ci。
+#   - build-card-index 把校验器警告当失败（契约 §2.8）：官方卡任何警告、未知 W_ 码、无码警告都失败。
+#   - setup-node 不开 npm 缓存。
+#   - publish 去掉了 environment url（vars.TEMPLATES_ORIGIN）和发布后的冒烟检查；Pages 项目名改用 secrets 占位名。
+#   - concurrency 按 job 分组：检查类 job 按 PR/ref 分组可取消；publish 单独一组、不取消。
 name: Cards CI
 
 on:
@@ -11,13 +20,12 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: cards-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
-
 jobs:
   cards-ok:
     name: cards-ok
+    concurrency:
+      group: cards-check-cards-ok-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -29,8 +37,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: tools/card-validator/package-lock.json
+      - name: 核对校验器与 m0 原件一致
+        run: sha256sum --strict -c tools/card-validator.SOURCE.sha256
       - run: npm ci --prefix tools/card-validator --ignore-scripts
       - name: 严格校验并生成索引（不允许未审核）
         run: |
@@ -59,6 +67,9 @@ jobs:
     # 独立的审核门槛：只读仓库内容，不调用 GitHub API、不依赖 PR Approve。
     # 检查含代码卡片有 securityReviewedBy；审核记录文件存在于 reviews/；记录含卡片 id、版本与当前 card.json 的 sha256。
     name: review-gate
+    concurrency:
+      group: cards-check-review-gate-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -76,6 +87,9 @@ jobs:
   publish:
     if: github.event_name == 'push'
     needs: [cards-ok, review-gate]
+    concurrency:
+      group: cards-publish
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
