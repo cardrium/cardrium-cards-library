@@ -176,7 +176,14 @@ async function main() {
     if (validateCard) {
       const r = validateCard(card);
       for (const e of r.errors || []) errors.push(`card.json ${e.code ? `[${e.code}] ` : ''}${e.path || ''} ${e.message}`);
-      for (const w of r.warnings || []) warnings.push(`card.json ${w.code ? `[${w.code}] ` : ''}${w.path || ''} ${w.message}`);
+      // 契约 §2.8（架构师审查 P1-2）：未知 W_ 码、无码警告一律失败；官方示范卡的任何警告都失败
+      const ALLOWED_W = new Set([]);   // 已知可放行的码（社区卡用）；官方卡不看这个表，一律失败
+      for (const w of r.warnings || []) {
+        const code = String(w.code || '');
+        const msg = `card.json [${code || '无码'}] ${w.path || ''} ${w.message}`;
+        if (manifest.status === 'official' || !code.startsWith('W_') || !ALLOWED_W.has(code)) errors.push(msg);
+        else warnings.push(msg);
+      }
     } else {
       if (!card.meta || typeof card.meta !== 'object') errors.push('card.json 缺少 meta');
       if (!card.permissions || typeof card.permissions !== 'object') errors.push('card.json 缺少 permissions');
