@@ -1,0 +1,6 @@
+{
+  "_comment": "含代码卡片进生产索引的安全前提。只有 closed=true 且 cardSha256 与当前 card.json 一致才放行。本文件受 CODEOWNER 保护，由安全人员 Approve 的 PR 修改。",
+  "cards": {
+    "keyword-watch": { "precondition": "P2-1 运行时防护（目标 10-21）经安全实测通过", "closed": false, "cardSha256": null, "evidence": null }
+  }
+}
