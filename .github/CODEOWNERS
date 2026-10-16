@@ -1,1 +1,22 @@
-* @penghuteng
+# 默认：所有路径都需要 CODEOWNER Approve（建议 1）。机器人/App 永不出现在本文件（建议 4）。
+# 注意：后匹配覆盖前匹配；路径区分大小写。
+*                         @penghuteng
+
+# 纯文案/文档白名单（仅这些路径免 CODEOWNER；无 owner = 不要求 CODEOWNER 审核）
+/docs/**/*.md
+/README.md
+# 注意：cards/*/README.md 不放入白名单（A4：README 可夹带网址，随卡片一起审）
+
+# 安全敏感路径（再次显式列出，防止上面白名单误伤；最后匹配生效）
+/.github/                 @penghuteng
+/tools/                   @penghuteng
+/reviews/                 @penghuteng
+/cards/                   @penghuteng
+/package*.json            @penghuteng
+/.npmrc                   @penghuteng
+/.nvmrc                   @penghuteng
+/.node-version            @penghuteng
+/.gitleaks*               @penghuteng
+/ops/                     @penghuteng
+/.github/CODEOWNERS       @penghuteng
+# TODO：安全团队成立后把 /reviews/ /tools/ci/ /.github/ 改为 @cardrium/security，解决单人自审
