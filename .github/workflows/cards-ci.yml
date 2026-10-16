@@ -119,7 +119,7 @@ jobs:
           "$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1 --log-opts=HEAD --gitleaks-ignore-path .gitleaksignore .
 
   production-gate:
-    # 必需检查。判定脚本与前提清单从 base 分支（PR）/ main（push）加载，PR head 改不了门禁（建议 2）。
+    # 必需检查。判定脚本与前提清单从 PR base.sha / push 的 github.event.before 加载，PR head 改不了门禁（建议 2）。
     # 含代码卡片在安全前提关闭前不得进入生产索引；cards/ 下禁止 symlink/submodule（A5）。
     name: production-gate
     concurrency:
@@ -138,8 +138,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: base
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          # R2-4：脚本永不取自被检查的提交本身。PR → base.sha；push → github.event.before（推送前的 main）。
+          # workflow_dispatch 或 before 为全 0（新建分支）时没有可信 ref → 下一步直接失败（fail closed）。
+          ref: ${{ github.event.pull_request.base.sha || github.event.before }}
           persist-credentials: false
+      - name: 可信 ref 检查（fail closed）
+        env:
+          TRUSTED: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SELF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TRUSTED" ] || [ "$TRUSTED" = "0000000000000000000000000000000000000000" ] || [ "$TRUSTED" = "$SELF" ]; then
+            echo "::error::没有独立于被检查提交的可信 ref（event=${{ github.event_name }}），production-gate 拒绝运行"; exit 1; fi
+          [ "$(git -C base rev-parse HEAD)" = "$TRUSTED" ] || { echo "::error::base 检出与可信 ref 不符"; exit 1; }
+          test -f base/tools/ci/production-gate.mjs || { echo "::error::可信 ref 上没有 tools/ci/production-gate.mjs（引导期：v2 合入前此检查不设必需）"; exit 1; }
+          echo "门禁脚本来源：$TRUSTED（被检查：$SELF）" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
