@@ -1,0 +1,24 @@
+{
+  "name": "card-validator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "卡片定义 v1 校验：JSON Schema（Ajv, draft 2020-12）+ 跨字段语义校验 + 示范卡片 dry-run",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tools/sync-runtime-netmatch.mjs --check && node validate.mjs --selftest && node dryrun.mjs && node tools/validate-snapshots.mjs",
+    "validate": "node validate.mjs",
+    "dryrun": "node dryrun.mjs",
+    "gen:schema": "node tools/gen-schema.mjs",
+    "gen:invalid": "node tools/make-invalid.mjs",
+    "sync:runtime": "node tools/sync-runtime-netmatch.mjs",
+    "validate:snapshots": "node tools/validate-snapshots.mjs",
+    "capture:snapshots": "node tools/capture-snapshots.mjs"
+  },
+  "dependencies": {
+    "acorn": "8.18.0",
+    "ajv": "8.20.0",
+    "ajv-i18n": "4.2.0",
+    "jsonata": "2.2.2"
+  }
+}

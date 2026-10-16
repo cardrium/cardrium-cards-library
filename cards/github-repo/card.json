@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1",
+  "meta": {
+    "id": "github-repo",
+    "name": "GitHub 仓库动态",
+    "description": "显示公开仓库的 Star 数与较昨日变化，以及最新版本、新 issue 和最近推送",
+    "author": "official",
+    "version": "1.0.1",
+    "icon": "⭐",
+    "tags": [
+      "开发",
+      "监测"
+    ],
+    "locale": "zh-CN",
+    "license": "MIT-0",
+    "source": "human"
+  },
+  "permissions": {
+    "network": [
+      "https://api.github.com/repos/*"
+    ],
+    "model": true,
+    "storage": true,
+    "code": false
+  },
+  "limits": {
+    "modelCallsPerRun": 1
+  },
+  "estimates": {
+    "modelCalls": 1,
+    "searchCalls": 0,
+    "inputTokens": 300,
+    "outputTokens": 80
+  },
+  "inputs": [
+    {
+      "key": "repo",
+      "label": "仓库（owner/name）",
+      "type": "string",
+      "required": true,
+      "placeholder": "vuejs/core",
+      "pattern": "^[\\w.-]+/[\\w.-]+$",
+      "help": "填写仓库现在的名字。改过名或转移过的仓库会返回跳转，卡片不跟随跳转"
+    },
+    {
+      "key": "showSummary",
+      "label": "AI 总结",
+      "type": "boolean",
+      "default": true,
+      "help": "关闭或没有配置模型时显示规则生成的说明"
+    }
+  ],
+  "workflow": {
+    "trigger": {
+      "onOpen": {
+        "skipIfFreshMinutes": 30
+      },
+      "manual": true,
+      "intervalMinutes": 60
+    },
+    "steps": [
+      {
+        "id": "n1",
+        "type": "http",
+        "name": "仓库信息",
+        "method": "GET",
+        "url": "https://api.github.com/repos/{{inputs.repo}}",
+        "headers": {
+          "Accept": "application/vnd.github+json"
+        },
+        "responseType": "json"
+      },
+      {
+        "id": "n2",
+        "type": "http",
+        "name": "最新版本",
+        "method": "GET",
+        "url": "https://api.github.com/repos/{{inputs.repo}}/releases?per_page=1",
+        "headers": {
+          "Accept": "application/vnd.github+json"
+        },
+        "responseType": "json",
+        "onError": "continue"
+      },
+      {
+        "id": "n3",
+        "type": "http",
+        "name": "最近 issue",
+        "method": "GET",
+        "url": "https://api.github.com/repos/{{inputs.repo}}/issues?state=open&sort=created&direction=desc&per_page=10",
+        "headers": {
+          "Accept": "application/vnd.github+json"
+        },
+        "responseType": "json",
+        "onError": "continue"
+      },
+      {
+        "id": "n4",
+        "type": "storage",
+        "name": "读取每日快照",
+        "op": "get",
+        "key": "history",
+        "default": []
+      },
+      {
+        "id": "n5",
+        "type": "transform",
+        "name": "计算变化与说明",
+        "expr": "( $today := run.today; $prev := [n4[date < $today]]; $last := $prev[-1]; $issues := [n3.body[$not($exists(pull_request)) and $toMillis($$.run.now) - $toMillis(created_at) <= 86400000]]; $rel := n2.body[0]; $relText := $rel ? $rel.tag_name & '（' & $substring($rel.published_at, 0, 10) & '）' : '暂无'; { \"record\": { \"date\": $today, \"stars\": n1.stargazers_count, \"forks\": n1.forks_count, \"openIssues\": n1.open_issues_count }, \"stars\": n1.stargazers_count, \"delta\": $last ? n1.stargazers_count - $last.stars : null, \"newIssues\": { \"count\": $count($issues), \"titles\": [$issues[[0..4]].title] }, \"latestRelease\": $relText, \"fallbackNote\": $join([$rel ? '最新版本 ' & $relText : '', n3 ? '24 小时内新 issue ' & $string($count($issues)) & ' 个' : '', '最近推送 ' & $substring(n1.pushed_at, 0, 10)][$ != ''], ' · '), \"fingerprint\": ($rel ? $rel.tag_name : '') & '-' & $string($count($issues)) } )"
+      },
+      {
+        "id": "n6",
+        "type": "storage",
+        "name": "记录今日快照",
+        "op": "append",
+        "key": "history",
+        "value": "{{n5.record}}",
+        "uniqueBy": "date",
+        "maxLength": 90
+      },
+      {
+        "id": "n7",
+        "type": "ai",
+        "name": "AI 一句话总结",
+        "enabledIf": {
+          "expr": "inputs.showSummary and run.modelConfigured"
+        },
+        "onError": "continue",
+        "model": {
+          "tier": "fast"
+        },
+        "prompt": "下面是 GitHub 仓库 {{inputs.repo}} 的最新数据：Star {{n5.stars}}（较昨日 {{n5.delta}}），最新版本 {{n5.latestRelease}}，24 小时内新 issue {{n5.newIssues.count}} 个，标题：{{n5.newIssues.titles}}；最近推送：{{n1.pushed_at}}。\n用{{run.locale}}对应的语言写一句不超过 60 字的动态总结，只陈述上面给出的事实，突出最值得注意的一点。不要使用 Markdown。",
+        "outputFormat": "text",
+        "maxTokens": 200,
+        "cacheKey": "{{run.today}}-{{n5.fingerprint}}"
+      },
+      {
+        "id": "n8",
+        "type": "output",
+        "bind": {
+          "value": "{{n5.stars}}",
+          "unit": "★",
+          "label": "{{inputs.repo}}",
+          "delta": "{{n5.delta}}",
+          "deltaLabel": "较昨日",
+          "note": {
+            "expr": "n7.text ? n7.text : n5.fallbackNote"
+          },
+          "link": "{{n1.html_url}}"
+        }
+      }
+    ]
+  },
+  "display": {
+    "component": "number",
+    "options": {
+      "compact": true
+    },
+    "size": {
+      "w": 3,
+      "h": 3
+    }
+  }
+}

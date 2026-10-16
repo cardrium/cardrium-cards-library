@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workbench.example/schema/card-manifest-v1.json",
+  "title": "官方示范卡片仓库：卡片上架清单 manifest.json（草案 v1）",
+  "description": "只放“上架/审核/展示”相关的元数据。名称、描述、作者、版本、标签、权限等一律以同目录 card.json（卡片定义 schema v1）为准，索引生成脚本从 card.json 派生，避免两处不一致。$id 域名为占位，产品名与域名确定后替换。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "status",
+    "preview",
+    "review"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$",
+      "description": "必须同时等于目录名和 card.json 的 meta.id。"
+    },
+    "status": {
+      "enum": [
+        "official",
+        "community",
+        "experimental",
+        "deprecated"
+      ],
+      "description": "official=官方示范卡片（第一版 8 张）；community=社区投稿（M3 开放）；experimental=实验，站点默认不展示；deprecated=下架中，站点只对已导入用户提示。"
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9999,
+      "description": "展示排序，越小越靠前；缺省 1000。"
+    },
+    "preview": {
+      "type": "string",
+      "pattern": "^preview\\.(png|webp)$",
+      "description": "预览图文件名。只允许 PNG/WebP（不允许 SVG：SVG 可内嵌脚本）。建议 1200×750（16:10），≤ 300 KB。"
+    },
+    "readme": {
+      "type": "string",
+      "const": "README.md",
+      "description": "说明文档，固定为 README.md。"
+    },
+    "minAppVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "需要的最低站点版本（SemVer）。站点版本低于它时列表里置灰并提示升级。"
+    },
+    "maintainers": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+      },
+      "description": "GitHub 用户名，负责后续维护与问题响应。"
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewedBy",
+        "reviewedVersion",
+        "reviewedAt",
+        "reviewRecord"
+      ],
+      "properties": {
+        "reviewedBy": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+          },
+          "description": "功能/内容审核人：GitHub 用户名或角色名（小写英文，如 architect、security）。"
+        },
+        "securityReviewedBy": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+          },
+          "description": "安全审核人：GitHub 用户名或角色名（小写英文）。card.json 中 permissions.code=true 时必填且非空。"
+        },
+        "reviewedVersion": {
+          "type": "string",
+          "description": "审核时的 card.json meta.version。必须等于当前版本，否则视为“改了代码但没重新审核”。"
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "reviewRecord": {
+          "type": "string",
+          "pattern": "^reviews/[A-Za-z0-9][A-Za-z0-9._-]*\\.md$",
+          "description": "功能/内容审核记录：仓库内 reviews/ 下的文件路径。记录中必须含卡片 id、版本、card.json 的 sha256。"
+        },
+        "securityReviewRecord": {
+          "type": "string",
+          "pattern": "^reviews/[A-Za-z0-9][A-Za-z0-9._-]*\\.md$",
+          "description": "安全审核记录：仓库内 reviews/ 下的文件路径，要求同 reviewRecord。"
+        }
+      },
+      "dependentRequired": {
+        "securityReviewedBy": [
+          "securityReviewRecord"
+        ],
+        "securityReviewRecord": [
+          "securityReviewedBy"
+        ]
+      }
+    },
+    "deprecated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "replacedBy": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "deprecated"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "deprecated"
+        ]
+      }
+    }
+  ]
+}
