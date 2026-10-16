@@ -1,0 +1,20 @@
+{
+  "id": "keyword-watch",
+  "status": "official",
+  "preview": "preview.png",
+  "readme": "README.md",
+  "minAppVersion": "1.0.0",
+  "review": {
+    "reviewedBy": [
+      "architect"
+    ],
+    "securityReviewedBy": [
+      "security"
+    ],
+    "reviewedVersion": "1.0.1",
+    "reviewedAt": "2026-10-15",
+    "reviewRecord": "reviews/architect-cards-library-firstpush-20261015.md",
+    "securityReviewRecord": "reviews/security-demo-cards-20261015.attest.md",
+    "notes": "1.0.1 architect re-review per ai-workbench/app ops/scripts/test-build-card-index.sh (commit 9807ea1)；安全审核：security（见 securityReviewRecord）；发布批准：penghuteng（CODEOWNER Approve）"
+  }
+}
