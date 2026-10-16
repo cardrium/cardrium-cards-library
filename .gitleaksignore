@@ -1,8 +1,8 @@
 # 测试用假凭据：tools/card-validator/tools/make-invalid.mjs 第 105 行（校验器 E_SECRET_PARAM 反例，非真实密钥）
-1a6865641e5108d421a9e1f7422639375482f007:tools/card-validator/tools/make-invalid.mjs:generic-api-key:105
+613e68f09aec6a37bac514602d3d6596a88286b4:tools/card-validator/tools/make-invalid.mjs:generic-api-key:105
 # 测试用假凭据：tools/card-validator/tools/make-invalid.mjs 第 106 行（校验器 E_SECRET_PARAM 反例，非真实密钥）
-1a6865641e5108d421a9e1f7422639375482f007:tools/card-validator/tools/make-invalid.mjs:generic-api-key:106
+613e68f09aec6a37bac514602d3d6596a88286b4:tools/card-validator/tools/make-invalid.mjs:generic-api-key:106
 # 测试用假凭据：tools/card-validator/tools/make-invalid.mjs 第 107 行（校验器 E_SECRET_PARAM 反例，非真实密钥）
-1a6865641e5108d421a9e1f7422639375482f007:tools/card-validator/tools/make-invalid.mjs:generic-api-key:107
+613e68f09aec6a37bac514602d3d6596a88286b4:tools/card-validator/tools/make-invalid.mjs:generic-api-key:107
 # 测试用假凭据：tools/card-validator/tools/make-invalid.mjs 第 146 行（校验器 E_SECRET_PARAM 反例，非真实密钥）
-1a6865641e5108d421a9e1f7422639375482f007:tools/card-validator/tools/make-invalid.mjs:generic-api-key:146
+613e68f09aec6a37bac514602d3d6596a88286b4:tools/card-validator/tools/make-invalid.mjs:generic-api-key:146

@@ -9,6 +9,7 @@
 #   - setup-node 不开 npm 缓存。
 #   - publish 去掉了 environment url（vars.TEMPLATES_ORIGIN）和发布后的冒烟检查；Pages 项目名改用 secrets 占位名。
 #   - concurrency 按 job 分组：检查类 job 按 PR/ref 分组可取消；publish 单独一组、不取消。
+#   - 新增 gitleaks job（按 ops/03）：gitleaks CLI v8.30.1（按 sha256 固定）扫描完整历史，读取 .gitleaksignore。
 name: Cards CI
 
 on:
@@ -83,6 +84,38 @@ jobs:
           node-version: "24"
       - name: 审核记录校验
         run: node tools/review-gate.mjs --cards cards
+
+  gitleaks:
+    # 按 ops/03：每个 PR 和 main 的 push 都扫完整 git 历史；只认 .gitleaksignore 里的完整指纹（不用通配符）。
+    name: gitleaks
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    concurrency:
+      group: cards-check-gitleaks-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"  # gitleaks_8.30.1_linux_x64.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 安装 gitleaks（校验 sha256）
+        run: |
+          set -euo pipefail
+          f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$f"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$f" | sha256sum --strict -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+      - name: 扫描完整历史
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1 --log-opts=HEAD --gitleaks-ignore-path .gitleaksignore .
 
   publish:
     if: github.event_name == 'push'
